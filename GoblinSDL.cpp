@@ -25,6 +25,7 @@ void showInventory(SDL_Renderer* renderer, TTF_Font* font);
 void processBattle(SDL_Renderer* renderer, TTF_Font* font);
 bool updateBattle(SDL_Event& event); 
 void executeBattleTurn();
+void levelUp(SDL_Renderer* renderer, TTF_Font* font);
 
 // Globals
 int cellSize = 10;
@@ -107,6 +108,9 @@ if (!font) {
     
 
     while (running) {
+        if (playerExperience >= playerExperienceToNextLevel) {
+            levelUp(renderer, font);
+        }
         while (SDL_PollEvent(&event)) {
            
             if (event.type == SDL_QUIT) {
@@ -405,6 +409,28 @@ void showInventory(SDL_Renderer* renderer, TTF_Font* font)
         SDL_RenderCopy(renderer, statsTexture, NULL, &statsRect);
         SDL_FreeSurface(statsSurface);
         SDL_DestroyTexture(statsTexture);
+        // display player stats
+        SDL_Surface* statsSurface2 = TTF_RenderText_Solid(font, ("Health: " + std::to_string(playerHealth)).c_str(), textColor2);
+        SDL_Texture* statsTexture2 = SDL_CreateTextureFromSurface(renderer, statsSurface2);
+        SDL_Rect statsRect2 = {20, 90, statsSurface2->w, statsSurface2->h};
+        SDL_RenderCopy(renderer, statsTexture2, NULL, &statsRect2);
+        SDL_FreeSurface(statsSurface2);
+        SDL_DestroyTexture(statsTexture2);
+        // display player experience
+        SDL_Surface* statsSurface3 = TTF_RenderText_Solid(font, ("Experience: " + std::to_string(playerExperience)).c_str(), textColor2);
+        SDL_Texture* statsTexture3 = SDL_CreateTextureFromSurface(renderer, statsSurface3);
+        SDL_Rect statsRect3 = {20, 120, statsSurface3->w, statsSurface3->h};
+        SDL_RenderCopy(renderer, statsTexture3, NULL, &statsRect3);
+        SDL_FreeSurface(statsSurface3);
+        SDL_DestroyTexture(statsTexture3);
+        // display player level
+        SDL_Surface* statsSurface4 = TTF_RenderText_Solid(font, ("Level: " + std::to_string(playerLevel)).c_str(), textColor2);
+        SDL_Texture* statsTexture4 = SDL_CreateTextureFromSurface(renderer, statsSurface4);
+        SDL_Rect statsRect4 = {20, 150, statsSurface4->w, statsSurface4->h};
+        SDL_RenderCopy(renderer, statsTexture4, NULL, &statsRect4);
+        SDL_FreeSurface(statsSurface4);
+        SDL_DestroyTexture(statsTexture4);
+
 
     } else {
         // Reset the stored name when inventory is closed
@@ -532,4 +558,30 @@ void executeBattleTurn() {
         }
         bPlayerTurn = true;
     }
+}
+
+void levelUp(SDL_Renderer* renderer, TTF_Font* font) {
+    playerLevel++;
+    //playerExperience = 0;
+    playerExperienceToNextLevel = playerExperience + (playerLevel * 75) + (playerLevel * 50);
+    playerMaxHealth += playerLevel * 10;
+    playerHealth = playerMaxHealth;
+    playerMaxMana += 10;
+    playerMana = playerMaxMana;
+    playerAttack += 5;
+    playerDefense += 2;
+    playerSpeed += 1;
+    // display level up message
+    SDL_Color textColor = {255, 255, 255};
+    SDL_Surface* levelUpSurface = TTF_RenderText_Solid(font, "Level up!", textColor);
+    SDL_Texture* levelUpTexture = SDL_CreateTextureFromSurface(renderer, levelUpSurface);
+    SDL_Rect levelUpRect = {10, 10, levelUpSurface->w, levelUpSurface->h};
+    SDL_RenderCopy(renderer, levelUpTexture, NULL, &levelUpRect);
+    SDL_FreeSurface(levelUpSurface);
+    SDL_DestroyTexture(levelUpTexture);
+    SDL_RenderPresent(renderer);
+    SDL_Delay(1000);
+    SDL_RenderClear(renderer);
+    
+
 }
