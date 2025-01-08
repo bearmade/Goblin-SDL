@@ -8,6 +8,8 @@
 
 using std::string;
 using std::vector;
+using std::cout;
+using std::endl;
 
 // Function prototypes
 void initMap(int gridWidth, int gridHeight, vector<vector<int>>& map);
@@ -18,14 +20,39 @@ int countNeighbors(int gridWidth, int gridHeight, vector<vector<int>>& map, int 
 void outlineTiles(int gridWidth, int gridHeight, vector<vector<int>>& map, int tile, int targetTile);
 void replaceTiles(int gridWidth, int gridHeight, vector<vector<int>>& map, int tile, int targetTile, int replacementTile, int threshold);
 int getRandom(int low, int high);
-void showInventory(SDL_Renderer* renderer, TTF_Font* font);
 string randomName();
+void showInventory(SDL_Renderer* renderer, TTF_Font* font);
+void processBattle(SDL_Renderer* renderer, TTF_Font* font);
+bool updateBattle(SDL_Event& event); 
+void executeBattleTurn();
 
 // Globals
 int cellSize = 10;
 bool bInventoryOpen = false;
+bool bBattleActive = false;
+
 SDL_Texture* inventoryTexture = nullptr;
 SDL_Surface* inventorySurface = nullptr;
+string currentInventoryName = "";
+string enemyName = "";
+int playerHealth = 100;
+int playerMaxHealth = 100;
+int playerMana = 100;
+int playerMaxMana = 100;
+int playerLevel = 1;
+int playerExperience = 0;
+int playerExperienceToNextLevel = 100;
+int playerAttack = 10;
+int playerDefense = 5;
+int playerSpeed = 5;
+int playerGold = 0;
+
+int enemyHealth = 0;//((playerLevel + 1) * 5) + getRandom(5, playerLevel * 5);
+int enemyAttack = 0;//(playerLevel * 2) + getRandom(1, playerLevel * 2);
+int enemyDefense = 0;//(playerLevel * 2) + getRandom(1, playerLevel * 2);
+bool bPlayerTurn = true;
+int selection = 0;
+
 
 int main() {
     srand(time(NULL));
@@ -75,23 +102,51 @@ if (!font) {
     int x = screenWidth / 2; // Start in the middle
     int y = screenHeight / 2; 
     int speed = cellSize;
+    string name = randomName();
+
+    
 
     while (running) {
         while (SDL_PollEvent(&event)) {
+           
             if (event.type == SDL_QUIT) {
-                running = false;
-            } else if (event.type == SDL_KEYDOWN) {
+                running = false;}
+            else if (event.type == SDL_KEYDOWN) {
                 int newX = x, newY = y;
                 switch (event.key.keysym.sym) {
-                    case SDLK_LEFT:  if(!bInventoryOpen) newX = x - speed; break;
-                    case SDLK_RIGHT: if(!bInventoryOpen) newX = x + speed; break;
-                    case SDLK_UP:    if(!bInventoryOpen) newY = y - speed; break;
-                    case SDLK_DOWN:  if(!bInventoryOpen) newY = y + speed; break;
-                    //case SDLK_0: cellSize = cellSize + 1; break;
-                    //case SDLK_9: cellSize = cellSize - 1; break;
-                    case SDLK_8: 
+                    case SDLK_LEFT:  
+                        if(bBattleActive) {
+                            selection = std::max(0, selection - 1);
+                        } else if(!bInventoryOpen) {
+                            newX = x - speed;
+                        }
+                        break;
+                    case SDLK_RIGHT: 
+                        if(bBattleActive) {
+                            selection = std::min(1, selection + 1);
+                        } else if(!bInventoryOpen) {
+                            newX = x + speed;
+                        }
+                        break;
+                    case SDLK_RETURN:
+                        if(bBattleActive) {
+                            updateBattle(event);
+                        }
+                        break;
+                    case SDLK_UP:    if(!bInventoryOpen && !bBattleActive) newY = y - speed; break;
+                    case SDLK_DOWN:  if(!bInventoryOpen && !bBattleActive) newY = y + speed; break;
+                    case SDLK_1: playerHealth = playerHealth - 10; break;
+                    case SDLK_7:
+                    enemyName = randomName();
+                    bBattleActive = true;
+                    enemyHealth = ((playerLevel + 1) * 5) + getRandom(5, playerLevel * 5);
+                    enemyAttack = (playerLevel * 2) + getRandom(1, playerLevel * 2);
+                    enemyDefense = (playerLevel * 2) + getRandom(1, playerLevel * 2);
+                    break;
+                    case SDLK_8:
+                    // Toggle inventory
+                    currentInventoryName = randomName();
                         bInventoryOpen = !bInventoryOpen;
-                        //showInventory(renderer, font); 
                         break;
                 }
                 // Move only if within bounds and on a floor tile
@@ -117,26 +172,34 @@ if (!font) {
             // draw text to screen
             SDL_Color color = {255, 255, 255};
             
-            SDL_Surface* textSurface = TTF_RenderText_Solid(font, "Welcome my guy", color);
-            if (textSurface) {
-                SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
-                SDL_Rect textRect = {10, 10, textSurface->w, textSurface->h};
-                SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
-                SDL_FreeSurface(textSurface);
-                SDL_DestroyTexture(textTexture);
-            }
+            // SDL_Surface* textSurface = TTF_RenderText_Solid(font, name.c_str(), color);
+            // if (textSurface) {
+            //     SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+            //     SDL_Rect textRect = {10, 10, textSurface->w, textSurface->h};
+            //     SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+            //     SDL_FreeSurface(textSurface);
+            //     SDL_DestroyTexture(textTexture);
+            // }
 
             // Draw inventory if open
             if(bInventoryOpen) {            
                 showInventory(renderer, font);
+                //processBattle(renderer, font);
+            }
+            if(bBattleActive) {
+                processBattle(renderer, font);
+                SDL_RenderPresent(renderer);
             }
 
 
 
         // Draw player
-        SDL_Rect rect = {x, y, cellSize, cellSize};
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_RenderFillRect(renderer, &rect);
+        if(!bInventoryOpen && !bBattleActive) {
+            SDL_Rect rect = {x, y, cellSize, cellSize};
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            SDL_RenderFillRect(renderer, &rect);
+        }
+      
 
         // Update screen
         SDL_RenderPresent(renderer);
@@ -308,17 +371,20 @@ int getRandom(int low, int high)
     return randomInteger;
 }
 
+
+
+
 void showInventory(SDL_Renderer* renderer, TTF_Font* font)
 {
-//    bInventoryOpen = !bInventoryOpen;
-    
     if(bInventoryOpen) {
+        
+        
         // Create inventory background
         SDL_SetRenderDrawColor(renderer, 50, 50, 50, 200);
-        SDL_Rect inventoryBG = {10, 10, 200, 300};
+        SDL_Rect inventoryBG = {10, 10, 880, 580};
         SDL_RenderFillRect(renderer, &inventoryBG);
         
-        // Create text
+        // Create text using stored name
         SDL_Color textColor = {255, 255, 255};
         SDL_Surface* inventorySurface = TTF_RenderText_Solid(font, "Inventory", textColor);
         SDL_Texture* inventoryTexture = SDL_CreateTextureFromSurface(renderer, inventorySurface);
@@ -330,9 +396,21 @@ void showInventory(SDL_Renderer* renderer, TTF_Font* font)
         // Clean up
         SDL_FreeSurface(inventorySurface);
         SDL_DestroyTexture(inventoryTexture);
+        // display player gold and stats
+        SDL_Color textColor2 = {255, 255, 255};
+        SDL_Surface* statsSurface = TTF_RenderText_Solid(font, ("Gold: " + std::to_string(playerGold)).c_str(), textColor2);
+
+        SDL_Texture* statsTexture = SDL_CreateTextureFromSurface(renderer, statsSurface);
+        SDL_Rect statsRect = {20, 60, statsSurface->w, statsSurface->h};
+        SDL_RenderCopy(renderer, statsTexture, NULL, &statsRect);
+        SDL_FreeSurface(statsSurface);
+        SDL_DestroyTexture(statsTexture);
+
+    } else {
+        // Reset the stored name when inventory is closed
+        
     }
 }
-
 string randomName() {
     //string names[] = {"Alice", "Bob", "Charlie", "David", "Eve", "Frank", "Grace", "Henry", "Isabelle", "Jack", "Karen", "Liam", "Mia", "Noah", "Olivia", "Peter", "Quinn", "Rachel", "Sam", "Tina", "Uma", "Victor", "Wendy", "Xavier", "Yara", "Zach"};
     string fname1[] = {"Snar", "Bar", "Gnar", "Baz", "Bum"};
@@ -344,4 +422,114 @@ string randomName() {
     
     //int index = getRandom(0, 4);
     return fullname;
+}
+
+void processBattle(SDL_Renderer* renderer, TTF_Font* font) {
+
+//    bPlayerTurn = true;
+//    selection = 0;
+
+    if (bBattleActive) {
+        // Draw battle background
+        SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+        SDL_SetRenderDrawColor(renderer, 25, 25, 25, 100);
+        SDL_Rect battleBG = {10, 10, 880, 580};
+        SDL_RenderFillRect(renderer, &battleBG);
+
+        // Enemy info
+        SDL_Color textColor = {255, 255, 255};
+        SDL_Surface* enemySurface = TTF_RenderText_Solid(font, enemyName.c_str(), textColor);
+        SDL_Texture* enemyTexture = SDL_CreateTextureFromSurface(renderer, enemySurface);
+        SDL_Rect enemyRect = {10, 10, enemySurface->w, enemySurface->h};
+        SDL_RenderCopy(renderer, enemyTexture, NULL, &enemyRect);
+        SDL_FreeSurface(enemySurface);
+        SDL_DestroyTexture(enemyTexture);
+
+        // Health bars
+        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+        SDL_Rect enemyHealthBar = {10, 50, enemyHealth, 20};
+        SDL_RenderFillRect(renderer, &enemyHealthBar);
+
+        SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
+        SDL_Rect playerHealthBar = {10, 80, playerHealth, 20};
+        SDL_RenderFillRect(renderer, &playerHealthBar);
+
+        // Player options
+        const char* options[] = {"Attack", "Run"};
+        for (int i = 0; i < 2; i++) {
+            SDL_Rect button = {20 + i * 130, 110, 100, 25};
+            SDL_SetRenderDrawColor(renderer, (i == selection) ? 0 : 0, (i == selection) ? 191 : 64, (i == selection) ? 255 : 128, 255);
+            SDL_RenderFillRect(renderer, &button);
+
+            SDL_Surface* textSurface = TTF_RenderText_Solid(font, options[i], textColor);
+            SDL_Texture* textTexture = SDL_CreateTextureFromSurface(renderer, textSurface);
+            SDL_Rect textRect = {button.x, button.y, textSurface->w, textSurface->h};
+            SDL_RenderCopy(renderer, textTexture, NULL, &textRect);
+            SDL_FreeSurface(textSurface);
+            SDL_DestroyTexture(textTexture);
+        }
+
+        // Turn logic
+        executeBattleTurn();
+    }
+}
+
+// Add this function
+bool updateBattle(SDL_Event& event) {
+    if (!bBattleActive) return false;
+    
+    if (event.type == SDL_KEYDOWN) {
+        switch (event.key.keysym.sym) {
+            case SDLK_LEFT: 
+                selection = std::max(selection - 1, 0);
+                break;
+            case SDLK_RIGHT: 
+                selection = std::min(selection + 1, 1);
+                break;
+            case SDLK_RETURN:
+                if (selection == 0) {
+                    // Attack
+                    int damage = playerAttack - enemyDefense;
+                    damage = std::max(damage, 1); // Ensure minimum 1 damage
+                    enemyHealth -= damage;
+                    
+                    if (enemyHealth <= 0) {
+                        playerGold += getRandom(1, 10);
+                        playerExperience += getRandom(1, 10);
+                        bBattleActive = false;
+                        return false;
+                    }
+                    
+                    // Enemy counter-attack
+                    int enemyDamage = enemyAttack - playerDefense;
+                    enemyDamage = std::max(enemyDamage, 1);
+                    playerHealth -= enemyDamage;
+                    
+                    if (playerHealth <= 0) {
+                        playerHealth = 0;
+                        bBattleActive = false;
+                        return false;
+                    }
+                } else if (selection == 1) {
+                    bBattleActive = false;
+                    return false;
+                }
+                break;
+        }
+    }
+    return true;
+}
+
+void executeBattleTurn() {
+    if (!bPlayerTurn) {
+        cout << "Enemy's turn" << endl;
+        int damage = enemyAttack - playerDefense;
+        damage = std::max(damage, 0);
+        playerHealth -= damage;
+        if (playerHealth <= 0) {
+            playerHealth = 0;
+            bBattleActive = false;
+        }
+        bPlayerTurn = true;
+    }
 }
