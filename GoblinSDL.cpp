@@ -47,12 +47,16 @@ int playerAttack = 10;
 int playerDefense = 5;
 int playerSpeed = 5;
 int playerGold = 0;
+int steps = 0;
 
 int enemyHealth = 0;//((playerLevel + 1) * 5) + getRandom(5, playerLevel * 5);
 int enemyAttack = 0;//(playerLevel * 2) + getRandom(1, playerLevel * 2);
 int enemyDefense = 0;//(playerLevel * 2) + getRandom(1, playerLevel * 2);
 bool bPlayerTurn = true;
 int selection = 0;
+string battleText = "";
+string battleText2 = "";
+
 
 
 int main() {
@@ -77,7 +81,7 @@ if (!font) {
 }
         
     SDL_Window* window = SDL_CreateWindow(
-        "SDL2 game",
+        "Goblin II",
         SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
         screenWidth, screenHeight, SDL_WINDOW_SHOWN);
     SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
@@ -161,6 +165,18 @@ if (!font) {
                     map[newX / cellSize][newY / cellSize] == 1)) {
                     x = newX;
                     y = newY;
+                    steps++;
+                    if (map[x / cellSize][y / cellSize] == 1) {
+                     int randomNumber = getRandom(1, 100);
+                     if (randomNumber <= 30) {
+                    enemyName = randomName();
+                    bBattleActive = true;
+                    enemyHealth = ((playerLevel + 2) * 5) + getRandom(5, (playerLevel+5) * 5);
+                    enemyAttack = ((playerLevel +2)  * 2) + getRandom(5, (playerLevel + 5) * 2);
+                    enemyDefense = (playerLevel * 2) + getRandom(1, playerLevel * 2);
+                     }
+                    }
+
                 }
             }
         }
@@ -497,6 +513,8 @@ void processBattle(SDL_Renderer* renderer, TTF_Font* font) {
 
         // Turn logic
         executeBattleTurn();
+        // display battle messages
+        
     }
 }
 
@@ -515,6 +533,7 @@ bool updateBattle(SDL_Event& event) {
             case SDLK_RETURN:
                 if (selection == 0) {
                     // Attack
+                 
                     int damage = playerAttack - enemyDefense;
                     damage = std::max(damage, 1); // Ensure minimum 1 damage
                     enemyHealth -= damage;
@@ -527,6 +546,7 @@ bool updateBattle(SDL_Event& event) {
                     }
                     
                     // Enemy counter-attack
+                
                     int enemyDamage = enemyAttack - playerDefense;
                     enemyDamage = std::max(enemyDamage, 1);
                     playerHealth -= enemyDamage;
