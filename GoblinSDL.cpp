@@ -23,9 +23,10 @@ int getRandom(int low, int high);
 string randomName();
 void showInventory(SDL_Renderer* renderer, TTF_Font* font);
 void processBattle(SDL_Renderer* renderer, TTF_Font* font);
-bool updateBattle(SDL_Event& event); 
-void executeBattleTurn();
+bool updateBattle(SDL_Renderer* renderer, TTF_Font* font, SDL_Event& event); 
+void executeBattleTurn(SDL_Renderer* renderer, TTF_Font* font);
 void levelUp(SDL_Renderer* renderer, TTF_Font* font);
+void updateBattleTexture(SDL_Renderer* renderer, TTF_Font* font, string message);
 
 // Globals
 int cellSize = 10;
@@ -48,6 +49,8 @@ int playerDefense = 5;
 int playerSpeed = 5;
 int playerGold = 0;
 
+int messageY = 180;  // Starting Y position
+
 int steps = 0;
 int goblinsKilled = 0;
 
@@ -58,7 +61,7 @@ bool bPlayerTurn = true;
 int selection = 0;
 string battleText = "";
 string battleText2 = "";
-
+string battleMessage = "";
 
 
 int main() {
@@ -142,7 +145,7 @@ if (!font) {
                         break;
                     case SDLK_RETURN:
                         if(bBattleActive) {
-                            updateBattle(event);
+                            updateBattle(renderer, font, event);
                         }
                         break;
                     case SDLK_UP:    if(!bInventoryOpen && !bBattleActive) newY = y - speed; steps++; break;
@@ -178,6 +181,7 @@ if (!font) {
                     enemyHealth = ((playerLevel + 2) * 5) + getRandom(5, (playerLevel+5) * 5);
                     enemyAttack = ((playerLevel +2)  * 2) + getRandom(5, (playerLevel + 5) * 2);
                     enemyDefense = (playerLevel * 2) + getRandom(1, playerLevel * 2);
+                    battleMessage = "You encountered the goblin " + enemyName + "!";
                      }
                     }
 
@@ -206,14 +210,14 @@ if (!font) {
             // }
 
             // Draw inventory if open
-            if(bInventoryOpen) {            
+            if(bInventoryOpen && !bBattleActive) {            
                 showInventory(renderer, font);
                 //processBattle(renderer, font);
             }
-            if(bBattleActive) {
+            if(bBattleActive && !bInventoryOpen) {
 
                 processBattle(renderer, font);
-                SDL_RenderPresent(renderer);
+               // SDL_RenderPresent(renderer);
             }
 
 
@@ -411,7 +415,7 @@ void showInventory(SDL_Renderer* renderer, TTF_Font* font)
         
         // Create text using stored name
         SDL_Color textColor = {255, 255, 255};
-        SDL_Surface* inventorySurface = TTF_RenderText_Solid(font, "Inventory", textColor);
+        SDL_Surface* inventorySurface = TTF_RenderText_Solid(font, "Status", textColor);
         SDL_Texture* inventoryTexture = SDL_CreateTextureFromSurface(renderer, inventorySurface);
         
         // Render text
@@ -490,6 +494,7 @@ void processBattle(SDL_Renderer* renderer, TTF_Font* font) {
 
 //    bPlayerTurn = true;
 //    selection = 0;
+//battleMessage = "the wild goblin " + enemyName + " appears!";
 
     if (bBattleActive) {
         // Draw battle background
@@ -508,6 +513,14 @@ void processBattle(SDL_Renderer* renderer, TTF_Font* font) {
         SDL_DestroyTexture(enemyTexture);
 
         // Health bars
+        // Calculate health bar widths based on percentage of max health
+//int enemyHealthBarWidth = (enemyHealth * 200) / ((playerLevel + 2) * 5 + playerLevel * 5);
+//int playerHealthBarWidth = (playerHealth * 200) / playerMaxHealth;
+
+
+
+
+
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
         SDL_Rect enemyHealthBar = {10, 50, enemyHealth, 20};
         SDL_RenderFillRect(renderer, &enemyHealthBar);
@@ -531,15 +544,24 @@ void processBattle(SDL_Renderer* renderer, TTF_Font* font) {
             SDL_DestroyTexture(textTexture);
         }
 
+        //display battle messages
+        SDL_Surface* battleSurface = TTF_RenderText_Solid(font, battleMessage.c_str(), textColor);
+        SDL_Texture* battleTexture = SDL_CreateTextureFromSurface(renderer, battleSurface);
+        SDL_Rect battleRect = {10, 150, battleSurface->w, battleSurface->h};
+        SDL_RenderCopy(renderer, battleTexture, NULL, &battleRect);
+        SDL_FreeSurface(battleSurface);
+        SDL_DestroyTexture(battleTexture);
+
+        //updateBattleTexture(renderer, font, battleMessage);
         // Turn logic
-        executeBattleTurn();
+        executeBattleTurn(renderer, font);
         // display battle messages
         
     }
 }
 
 // Add this function
-bool updateBattle(SDL_Event& event) {
+bool updateBattle(SDL_Renderer* renderer, TTF_Font* font, SDL_Event& event) {
     if (!bBattleActive) return false;
     
     if (event.type == SDL_KEYDOWN) {
@@ -553,25 +575,41 @@ bool updateBattle(SDL_Event& event) {
             case SDLK_RETURN:
                 if (selection == 0) {
                     // Attack
+                     if (enemyHealth <= 0) {
+                        int goldAquired = getRandom(1, 10);
+                        playerGold += goldAquired;
+                        int experienceGained = getRandom(1, 10);
+                        playerExperience += experienceGained;
+                        goblinsKilled++;
+                        battleMessage = "You defeated "+enemyName+ " and gained " + std::to_string(goldAquired) + " gold and " + std::to_string(experienceGained) + " experience!";
+                        updateBattleTexture(renderer, font, battleMessage);
+                        SDL_RenderPresent(renderer);
+                        SDL_Delay(3000);
+                        bBattleActive = false;
+                        return false;
+                    } else {
                     playerAttack = ((playerLevel+2)*2) + getRandom(5, 25);
                     int damage = playerAttack - enemyDefense;
                     damage = std::max(damage, 1); // Ensure minimum 1 damage
                     enemyHealth -= damage;
-                    
-                    if (enemyHealth <= 0) {
-                        playerGold += getRandom(1, 10);
-                        playerExperience += getRandom(1, 10);
-                        goblinsKilled++;
-                        bBattleActive = false;
-                        return false;
+                    battleMessage = "You attacked "+enemyName+ " for " + std::to_string(damage) + " damage!";
+                    updateBattleTexture(renderer, font, battleMessage);
+                    SDL_RenderPresent(renderer);
+                    SDL_Delay(2000);
                     }
+                    //SDL_Delay(2000);
                     
                     // Enemy counter-attack
-                
+                    
+
+                    //SDL_Delay(2000);
                     int enemyDamage = enemyAttack - playerDefense;
                     enemyDamage = std::max(enemyDamage, 1);
                     playerHealth -= enemyDamage;
-                    
+                    battleMessage = enemyName+ " attacks you for " + std::to_string(enemyDamage) + " damage!";
+                    updateBattleTexture(renderer, font, battleMessage);
+                    SDL_RenderPresent(renderer);
+                    SDL_Delay(1000);
                     if (playerHealth <= 0) {
                         playerHealth = 0;
                         bBattleActive = false;
@@ -579,6 +617,8 @@ bool updateBattle(SDL_Event& event) {
                     }
                 } else if (selection == 1) {
                     bBattleActive = false;
+                    // drop some gold
+
                     return false;
                 }
                 break;
@@ -587,13 +627,19 @@ bool updateBattle(SDL_Event& event) {
     return true;
 }
 
-void executeBattleTurn() {
+void executeBattleTurn(SDL_Renderer* renderer, TTF_Font* font) {
     if (!bPlayerTurn) {
-        cout << "Enemy's turn" << endl;
+        //SDL_Delay(2000);
+        
         enemyAttack = (playerLevel * 2) + getRandom(1, playerLevel * 2);
-        //playerDefense = ((playerLevel + 2)*2) + getRandom(5, (playerLevel+2) * 2);
+        
+        //battleMessage = "The goblin attacks you for " + std::to_string(enemyAttack) + " damage!";
+        //updateBattleTexture(renderer, font, battleMessage);
+        //SDL_RenderPresent(renderer);
+        //SDL_Delay(2000);
+        playerDefense = ((playerLevel + 2)*2) + getRandom(5, (playerLevel+2) * 2);
         int damage = enemyAttack - playerDefense;
-
+        
         damage = std::max(damage, 0);
         playerHealth -= damage;
         if (playerHealth <= 0) {
@@ -629,3 +675,25 @@ void levelUp(SDL_Renderer* renderer, TTF_Font* font) {
     
 
 }
+
+void updateBattleTexture(SDL_Renderer* renderer, TTF_Font* font, string message) {
+    SDL_Color textColor = {255, 255, 255};
+    SDL_Surface* battleSurface = TTF_RenderText_Solid(font, message.c_str(), textColor);
+    SDL_Texture* battleTexture = SDL_CreateTextureFromSurface(renderer, battleSurface);
+    
+    // Create multiple message positions
+    
+    SDL_Rect battleRect = {10, messageY, battleSurface->w, battleSurface->h};
+    
+    // Increment Y position for next message, reset if too low
+    messageY += 30;  // Space between messages
+    if (messageY > 210) messageY = 180;  // Reset to top when reaching bottom
+    
+    SDL_RenderCopy(renderer, battleTexture, NULL, &battleRect);
+    SDL_FreeSurface(battleSurface);
+    SDL_DestroyTexture(battleTexture);
+    
+    SDL_RenderPresent(renderer);    
+}
+
+
