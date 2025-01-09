@@ -47,7 +47,9 @@ int playerAttack = 10;
 int playerDefense = 5;
 int playerSpeed = 5;
 int playerGold = 0;
+
 int steps = 0;
+int goblinsKilled = 0;
 
 int enemyHealth = 0;//((playerLevel + 1) * 5) + getRandom(5, playerLevel * 5);
 int enemyAttack = 0;//(playerLevel * 2) + getRandom(1, playerLevel * 2);
@@ -127,6 +129,7 @@ if (!font) {
                             selection = std::max(0, selection - 1);
                         } else if(!bInventoryOpen) {
                             newX = x - speed;
+                            steps++;
                         }
                         break;
                     case SDLK_RIGHT: 
@@ -134,6 +137,7 @@ if (!font) {
                             selection = std::min(1, selection + 1);
                         } else if(!bInventoryOpen) {
                             newX = x + speed;
+                            steps++;
                         }
                         break;
                     case SDLK_RETURN:
@@ -141,8 +145,8 @@ if (!font) {
                             updateBattle(event);
                         }
                         break;
-                    case SDLK_UP:    if(!bInventoryOpen && !bBattleActive) newY = y - speed; break;
-                    case SDLK_DOWN:  if(!bInventoryOpen && !bBattleActive) newY = y + speed; break;
+                    case SDLK_UP:    if(!bInventoryOpen && !bBattleActive) newY = y - speed; steps++; break;
+                    case SDLK_DOWN:  if(!bInventoryOpen && !bBattleActive) newY = y + speed; steps++; break;
                     case SDLK_1: playerHealth = playerHealth - 10; break;
                     case SDLK_7:
                     enemyName = randomName();
@@ -165,10 +169,10 @@ if (!font) {
                     map[newX / cellSize][newY / cellSize] == 1)) {
                     x = newX;
                     y = newY;
-                    steps++;
+                    
                     if (map[x / cellSize][y / cellSize] == 1) {
                      int randomNumber = getRandom(1, 100);
-                     if (randomNumber <= 30) {
+                     if (randomNumber <= 10 && !bBattleActive) {
                     enemyName = randomName();
                     bBattleActive = true;
                     enemyHealth = ((playerLevel + 2) * 5) + getRandom(5, (playerLevel+5) * 5);
@@ -207,6 +211,7 @@ if (!font) {
                 //processBattle(renderer, font);
             }
             if(bBattleActive) {
+
                 processBattle(renderer, font);
                 SDL_RenderPresent(renderer);
             }
@@ -446,6 +451,21 @@ void showInventory(SDL_Renderer* renderer, TTF_Font* font)
         SDL_RenderCopy(renderer, statsTexture4, NULL, &statsRect4);
         SDL_FreeSurface(statsSurface4);
         SDL_DestroyTexture(statsTexture4);
+        // display steps
+        SDL_Surface* statsSurface5 = TTF_RenderText_Solid(font, ("Steps: " + std::to_string(steps)).c_str(), textColor2);
+        SDL_Texture* statsTexture5 = SDL_CreateTextureFromSurface(renderer, statsSurface5);
+        SDL_Rect statsRect5 = {20, 180, statsSurface5->w, statsSurface5->h};
+        SDL_RenderCopy(renderer, statsTexture5, NULL, &statsRect5);
+        SDL_FreeSurface(statsSurface5);
+        SDL_DestroyTexture(statsTexture5);
+        // display goblins killed
+        SDL_Surface* statsSurface6 = TTF_RenderText_Solid(font, ("Goblins Killed: " + std::to_string(goblinsKilled)).c_str(), textColor2);
+        SDL_Texture* statsTexture6 = SDL_CreateTextureFromSurface(renderer, statsSurface6);
+        SDL_Rect statsRect6 = {20, 210, statsSurface6->w, statsSurface6->h};
+        SDL_RenderCopy(renderer, statsTexture6, NULL, &statsRect6);
+        SDL_FreeSurface(statsSurface6);
+        SDL_DestroyTexture(statsTexture6);
+
 
 
     } else {
@@ -533,7 +553,7 @@ bool updateBattle(SDL_Event& event) {
             case SDLK_RETURN:
                 if (selection == 0) {
                     // Attack
-                 
+                    playerAttack = ((playerLevel+2)*2) + getRandom(5, 25);
                     int damage = playerAttack - enemyDefense;
                     damage = std::max(damage, 1); // Ensure minimum 1 damage
                     enemyHealth -= damage;
@@ -541,6 +561,7 @@ bool updateBattle(SDL_Event& event) {
                     if (enemyHealth <= 0) {
                         playerGold += getRandom(1, 10);
                         playerExperience += getRandom(1, 10);
+                        goblinsKilled++;
                         bBattleActive = false;
                         return false;
                     }
@@ -569,7 +590,10 @@ bool updateBattle(SDL_Event& event) {
 void executeBattleTurn() {
     if (!bPlayerTurn) {
         cout << "Enemy's turn" << endl;
+        enemyAttack = (playerLevel * 2) + getRandom(1, playerLevel * 2);
+        //playerDefense = ((playerLevel + 2)*2) + getRandom(5, (playerLevel+2) * 2);
         int damage = enemyAttack - playerDefense;
+
         damage = std::max(damage, 0);
         playerHealth -= damage;
         if (playerHealth <= 0) {
